@@ -1,0 +1,128 @@
+==Connect SSH Auto==
+ssh-keygen -t rsa
+ssh-copy-id -i ~/.ssh/id_rsa.pub bstivers@plex3.local
+ssh-add ~/.ssh/id_rsa
+
+
+==Install microk8s==
+# https://microk8s.io/docs/getting-started
+sudo snap install microk8s --classic --channel=1.31
+sudo usermod -a -G microk8s $USER
+mkdir -p ~/.kube
+chmod 0700 ~/.kube
+microk8s status --wait-ready
+microk8s kubectl get nodes
+microk8s kubectl get services
+microk8s enable dashboard
+microk8s kubectl get all --all-namespaces
+
+
+==Create Docker Registry==
+# https://microk8s.io/docs/registry-built-in
+sudo apt install docker
+sudo nano /etc/docker/daemon.json
+{
+  "insecure-registries" : ["localhost:32000"] 
+}
+
+sudo systemctl restart docker
+microk8s enable registry
+sudo docker images
+
+
+==Deploy ComplexPassword==
+=On Dev=
+# https://thenewstack.io/kubernetes-101-deploy-your-first-application-with-microk8s/
+# http://127.0.0.1:5001
+# http://127.0.0.1:5001/?spacer=-
+sudo apt install docker.io
+sudo nano /etc/docker/daemon.json
+{
+  "insecure-registries" : ["plex3.local:32000"]
+}
+
+sudo systemctl reload docker
+sudo docker build -t plex3.local:32000/complexpassword .
+sudo docker run --network="host" plex3.local:32000/complexpassword
+sudo docker push plex3.local:32000/complexpassword
+curl -X GET http://plex3.local:32000/v2/_catalog
+=On Server=
+microk8s kubectl create deployment complexpassword --image=localhost:32000/complexpassword
+# microk8s kubectl get pods
+# microk8s kubectl describe pod
+# microk8s kubectl get all --all-namespaces
+# microk8s kubectl get all -n default
+microk8s kubectl expose deployment complexpassword --type="NodePort" --port 5000
+microk8s kubectl get svc complexpassword
+
+microk8s kubectl delete deployment complexpassword
+microk8s kubectl delete service/complexpassword
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+==Access Dashboard==
+microk8s dashboard-proxy
+
+https://127.0.0.1:10443
+Use the following token to login:
+eyJhbGciOiJSUzI1NiIsImtpZCI6IlBDV3F2UGtGWFByNllmS01yQjVKX3NZUjYybUsxX3d6Z0RZQklDQzhwMFkifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlLXN5c3RlbSIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJtaWNyb2s4cy1kYXNoYm9hcmQtdG9rZW4iLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoiZGVmYXVsdCIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50LnVpZCI6ImU5MGRhYjY0LTJiNzMtNDdmNy1hZDcxLWFjYTk5ZjhkMDQ5ZCIsInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDprdWJlLXN5c3RlbTpkZWZhdWx0In0.dQokJ7S-7RBKLunnKIslrrHVKI9FpjbrI65GEri-sEBYfIAuA2QmRvouoPUKs6gJgDx_dbogUZEKCuR8RocPoxcjvFopRmVsJUCTVcYQf10gQsbbFoJpU6uGNX9tIuRG74bApHpo2XvODpKg_aruIsC3eNvvK1EjbHB37wLo1XqamA0X_V_-BLb9Z53wZ7XPN9eMqKv2CR2MuuOXYY2lN_w2bWdmI8iA3yHGWURwk9UXWJ4uXHbaBcGHTKoId1UWtTRNqpng2vo5xkWzChSwDus-tNGA-d-KpiHqJkonK2LKEP7gWgKDDhb39dqEfmS0KIpBqRpDOyl9LaGXIHJ1kw
+
+ssh -v -N -L 8443:127.0.0.1:10443 bstivers@plex3.local
+https://127.0.0.1:8443
+
+docker buildx build --platform=linux/arm64 --platform=linux/amd64  -t docker.io/$your docker hub user name/$image name:$tag name --push  -f ./Dockerfile .
+docker build -t $your docker hub user name/$image name .
+
+sudo docker build . -t localhost:32000/complexpassword:registry
+
+docker push localhost:32000/mynginx
+
+sudo ufw allow in on cni0 && sudo ufw allow out on cni0
+sudo ufw default allow routed
+
+# https://ubuntu.com/tutorials/install-a-local-kubernetes-with-microk8s#3-enable-addons
+microk8s enable dns 
+microk8s enable dashboard
+microk8s enable storage
+microk8s kubectl get all --all-namespaces
+
+microk8s kubectl port-forward -n kubernetes-dashboard service/kubernetes-dashboard <TARGET_PORT>:443 --address 0.0.0.0
+ssh -v -N -L <TARGET_PORT>:127.0.0.1:8443 <USERNAME>@<ADDRESS>
+https://127.0.0.1:<TARGET_PORT>
+
+microk8s kubectl proxy --port=8080 --address=0.0.0.0 --disable-filter=true
+
+microk8s kubectl expose deployment kubernetes-dashboard -n kube-system --type=LoadBalancer --name=kdash --port=8001 --target-port=443
+microk8s kubectl delete service kdash -n kube-system
+
+microk8s kubectl port-forward -n kube-system service/kubernetes-dashboard 10443:443 --address 0.0.0.0
+
+microk8s kubectl -n kube-system edit service kubernetes-dashboard
+
+change the .spec.type to NodePort
+
+http://10.152.183.201:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:443/proxy/
+service/kubernetes-dashboard
+
+microk8s kubectl proxy --address='0.0.0.0' --accept-hosts='^*$'
+
+microk8s kubectl get nodes -v=10
+lsof -i -P -n | grep LISTEN|grep 8080
+
+snap info microk8s
+microk8s kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/1.31.1/aio/deploy/recommended.yaml
+
